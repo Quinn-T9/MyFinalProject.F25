@@ -1,6 +1,8 @@
 Description: see "Conceptualization"
 
 Use Cases
+CLARIFIED ANSWER:
+to play back a specific song and demonstrate how tempo and key signature manipulation impact the overall sound
 
 - play/stop button
 - gain slider
