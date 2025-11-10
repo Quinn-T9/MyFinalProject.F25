@@ -3,6 +3,9 @@ this is the stuff I'm telling you about
 I would like to ideally create a fully programmed piece of music using WebAudio with the ability to manipulate certain parameters like gain and key signature. I would also like to see if there's a way to manipulate the tempo of the playback during any playback sessions as an extra control slider in the website itself.
 This would use a series of oscillators with unique envelopes and a set array for the playback of the song that takes inputs from different user controls.
 
+EDIT: change to be made - separate each oscillator by part and allow each part to be triggered individually and additively.
+IN SUMMARY, a list of parts that can be toggled in combination with each other for playback, and all controlled by the user perameters specified
+
 Timeline needs to be visible, decide what notes are played and when
 a counter that works at a constant rate (either in seconds or beats per minute)
 

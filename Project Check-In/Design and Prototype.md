@@ -17,24 +17,6 @@
 | Fetch API → Communicates with Backend for song data |
 +------------------------------------------------------------+
 
-                      ⇅  (HTTP/JSON API)
-
-+------------------------------------------------------------+
-| Backend (Server) |
-|------------------------------------------------------------|
-| REST API / GraphQL Layer |
-| - /api/songs (GET list of songs) |
-| - /api/songs/:id (GET metadata + audio URL) |
-| |
-| Business Logic Layer |
-| - Song metadata handling |
-| - Audio file management |
-| |
-| Database Connector |
-+------------------------------------------------------------+
-
-                      ⇅  (SQL/NoSQL)
-
 +------------------------------------------------------------+
 | Database |
 |------------------------------------------------------------|
@@ -125,4 +107,4 @@ INDEX ROUGH IDEA
 </body>
 </html>
 
-NOTE: this doesn't hav e the customization themes I made from the week 10 lab as a stylistic guide.
+NOTE: this doesn't have the customization themes I made from the week 10 lab as a stylistic guide.

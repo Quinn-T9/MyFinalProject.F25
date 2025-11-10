@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Web Audio Song Player</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <h1>Playback for MIDI Song</h1>
+    <h2>Final Project by Quinn Terry</h2>
+
+    <button id="playBtn">Start Timeline</button>
+    <button id="playBtn">Toggle Arpeggiator</button>
+    <button id="playBtn">Toggle Bass Line</button>
+    <button id="playBtn">Toggle Bells</button>
+    <button id="playBtn">Toggle Block Chords</button>
+
+    <div class="control">
+      <label>Gain:</label>
+      <input
+        type="range"
+        id="gainSlider"
+        min="0"
+        max="2"
+        value="1"
+        step="0.01"
+      />
+    </div>
+    <div class="control">
+      <label>Tempo:</label>
+      <input
+        type="range"
+        id="tempoSlider"
+        min="0.5"
+        max="2"
+        value="1"
+        step="0.01"
+      />
+    </div>
+    <div class="control">
+      <label>Key Shift (semitones):</label>
+      <input
+        type="range"
+        id="keySlider"
+        min="-12"
+        max="12"
+        value="0"
+        step="1"
+      />
+    </div>
+
+    <script>
+      let audioCtx, source, gainNode;
+      let isPlaying = false;
+      let buffer,
+        playbackRate = 1.0,
+        gainValue = 1.0,
+        keyShift = 0;
+
+      async function loadAudio(url) {
+        const response = await fetch(url);
+        const arrayBuffer = await response.arrayBuffer();
+        return await audioCtx.decodeAudioData(arrayBuffer);
+      }
+
+      async function startPlayback() {
+        if (!audioCtx) audioCtx = new AudioContext();
+        if (!buffer) buffer = await loadAudio("song.mp3"); // your audio file
+
+        source = audioCtx.createBufferSource();
+        gainNode = audioCtx.createGain();
+
+        // Basic pitch and tempo adjustment
+        source.playbackRate.value = playbackRate * Math.pow(2, keyShift / 12);
+        gainNode.gain.value = gainValue;
+
+        source.buffer = buffer;
+        source.connect(gainNode).connect(audioCtx.destination);
+        source.start(0);
+        isPlaying = true;
+      }
+
+      document.getElementById("playBtn").addEventListener("click", () => {
+        if (!isPlaying) startPlayback();
+      });
+
+      document.getElementById("gainSlider").addEventListener("input", (e) => {
+        gainValue = parseFloat(e.target.value);
+        if (gainNode) gainNode.gain.value = gainValue;
+      });
+
+      document.getElementById("tempoSlider").addEventListener("input", (e) => {
+        playbackRate = parseFloat(e.target.value);
+        if (source)
+          source.playbackRate.value = playbackRate * Math.pow(2, keyShift / 12);
+      });
+
+      document.getElementById("keySlider").addEventListener("input", (e) => {
+        keyShift = parseInt(e.target.value);
+        if (source)
+          source.playbackRate.value = playbackRate * Math.pow(2, keyShift / 12);
+      });
+    </script>
+  </body>
+</html>

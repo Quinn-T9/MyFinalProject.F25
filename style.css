@@ -1,0 +1,64 @@
+/* this is a CSS comment*/
+body {
+  background-color: rgb(233, 179, 30);
+  justify-items: center;
+  align-items: center;
+  font-family: "Trebuchet MS", "Lucida Sans Unicode", "Lucida Grande",
+    "Lucida Sans", Arial, sans-serif;
+}
+
+h1 {
+  background-color: rgb(255, 255, 255);
+  border-radius: 10px;
+  padding: 10px;
+  outline: rgb(0, 0, 0);
+  outline-width: px;
+}
+
+h2 {
+  font-family: cursive;
+  color: rgb(0, 0, 0);
+}
+
+h3 {
+  text-align: center;
+}
+
+.control {
+  width: 50%;
+  background-color: rgb(0, 0, 0);
+  color: rgb(255, 255, 255);
+  align-content: center;
+  justify-items: center;
+  border-radius: 1em;
+  padding: 10px;
+  margin: 20px;
+  text-align: center;
+}
+
+button {
+  background-color: rgb(255, 255, 255);
+  border-radius: 20px;
+  transition: width 2s;
+  width: 100px;
+  font-size: medium;
+  text-align: center;
+  align-items: center;
+}
+
+button:hover {
+  width: 200px;
+}
+.ctlArea input {
+  text-align: center;
+}
+
+#transportArea {
+  text-align: center;
+}
+
+input {
+  accent-color: orange;
+  text-align: center;
+  align-items: center;
+}
