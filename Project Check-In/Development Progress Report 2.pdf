@@ -1,0 +1,7 @@
+I've been having difficulties with integrating MIDI decoding into my main project.
+I have some new code in another repository that I've been experimenting with, but I may need to look into some help from the internet on how to make my files actually decode properly.
+
+Things to do still:
+- download and convert all MIDI parts into readable files
+- continue work on back-end code and connections
+- get a working design that can output audio on my finalized project repository

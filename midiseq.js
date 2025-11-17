@@ -9,6 +9,58 @@ document.querySelector("button").onclick = () => ctx.resume;
 //then write out one part in midi notes with an identifying number
 //this sequence will be placed into an ARRAY for easy storage, access, and repeatability
 
+//------------START TOGGLE EXPERIMENTS---------------
+let toggleRow = document.querySelector("#toggleRow");
+
+for (let i = 0; i < 16; i++) {
+  toggleRow.innerHTML += `<input class="rowOne" type="checkbox" />`;
+  console.log(i);
+}
+
+let togs = document.querySelectorAll(".rowOne");
+console.log(togs);
+
+let counter = 0;
+setInterval(() => {
+  counter = counter % 16;
+  if (togs[counter].checked) {
+    console.log(Math.random());
+  }
+  counter++;
+}, 250);
+//----------------END TOGGLE EXPERIMENTS--------------
+//----------------START MIDI DECODER------------------
+const midi = await Midi.fromUrl(
+  "/Users/quinnterry/Documents/CPM/MyFinalProject.F25/Break the Mold Bells.mid"
+);
+//the file name decoded from the first track
+const name = midi.name;
+//get the tracks
+midi.tracks.forEach((track) => {
+  //tracks have notes and controlChanges
+
+  //notes are an array
+  const notes = track.notes;
+  notes.forEach((note) => {
+    console.log[(note.midi, note.time, note.duration, note.name)];
+  });
+
+  //the control changes are an object
+  //the keys are the CC number
+  track.controlChanges[64];
+  //they are also aliased to the CC number's common name (if it has one)
+  track.controlChanges.sustain.forEach((cc) => {
+    // cc.ticks, cc.value, cc.time
+  });
+
+  //the track also has a channel and instrument
+  //track.instrument.name
+});
+
+// write the output
+fs.writeFileSync("output.mid", new Buffer(midi.toArray()));
+//----------------END MIDI DECODER------------------
+
 //UNDERLYING ARPEGGIATOR: easiest to demonstrate here because there are no differing note durations, every note is the same length
 
 //D #C A D | #C A D #C | A D #C A | D #C A E (first 16 notes, all sixteenths in duration)

@@ -1,0 +1,10 @@
+So far, I have made decent strides with setting up the infrastructure needed in terms of a user interface.
+I have the general background and layout squared away, apart from a few minor issues.
+One of the major aesthetic issues I'm having is with making sure the buttons are center aligned on the page. (I believe we talked about this last week)
+
+Bigger concerns are as follows:
+
+I haven't created the actual programming needed to have each part as a playback. 
+I have preliminary note names and sequences as a comment, but I still need actual code to make that data usable.
+I'm also still unsure about a good way to visually represent the MIDI information being played back that the user can see in real time.
+Whether that would take the form of a MIDI keyboard playback, actual music notation, or some other form of visual representation like we see in Logic or Ableton.
