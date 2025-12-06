@@ -55,8 +55,8 @@ button.active {
 }
 
 button.inactive {
-  background-color: red;
-  color: white;
+  background-color: rgb(255, 255, 255);
+  color: rgb(0, 0, 0);
 }
 
 /* Control Sliders */
