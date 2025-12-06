@@ -1,4 +1,6 @@
-// MIDI files paths (to be replaced with actual paths)
+// --------------------------
+// MIDI File Paths
+// --------------------------
 const midiFiles = {
   arpeggiator: "assets/BtM Arp.mid",
   bassLine: "assets/BtM Bass.mid",
@@ -6,80 +8,119 @@ const midiFiles = {
   blockChords: "assets/BtM Choir.mid",
 };
 
-// Initialize Tone.js components
+// --------------------------
+// Tone.js Setup
+// --------------------------
 const synth = new Tone.PolySynth().toDestination();
 const reverb = new Tone.Reverb().toDestination();
 synth.connect(reverb);
 
-// State variables for each MIDI track
+// Track state
 let arpeggiatorEnabled = false;
 let bassLineEnabled = false;
 let bellsEnabled = false;
 let blockChordsEnabled = false;
 
-// Default tempo and key signature (based on MIDI)
-let defaultTempo = 111; // Default tempo from the MIDI files
-let defaultKeySignature = 0; // Default key signature (A Major)
+// Tempo + Key
+let defaultTempo = 111;
+let currentTempo = defaultTempo;
+let keyShift = 0;
 
-// Load MIDI files asynchronously
+// Active scheduled events and voices
+let scheduledEvents = [];
+let activeVoices = [];
+
+// --------------------------
+// Load MIDI Files
+// --------------------------
 async function loadMIDI(file) {
   try {
-    // Use Tone.Midi to parse the arrayBuffer (this is the updated approach)
-    const midi = await new Midi.fromUrl(file);
-    return midi; // Return the parsed MIDI data
+    const midi = await Midi.fromUrl(file);
+    return midi;
   } catch (error) {
-    console.error("Error loading MIDI file:", error);
-    return null; // Return null in case of failure
+    console.error("Error loading MIDI:", error);
+    return null;
   }
 }
 
-// MIDI file containers
 let arpeggiatorMidi, bassLineMidi, bellsMidi, blockChordsMidi;
 
-// Load MIDI files into memory
 Promise.all([
-  loadMIDI(midiFiles.arpeggiator).then((midi) => (arpeggiatorMidi = midi)),
-  loadMIDI(midiFiles.bassLine).then((midi) => (bassLineMidi = midi)),
-  loadMIDI(midiFiles.bells).then((midi) => (bellsMidi = midi)),
-  loadMIDI(midiFiles.blockChords).then((midi) => (blockChordsMidi = midi)),
+  loadMIDI(midiFiles.arpeggiator).then((m) => (arpeggiatorMidi = m)),
+  loadMIDI(midiFiles.bassLine).then((m) => (bassLineMidi = m)),
+  loadMIDI(midiFiles.bells).then((m) => (bellsMidi = m)),
+  loadMIDI(midiFiles.blockChords).then((m) => (blockChordsMidi = m)),
 ]).then(() => {
-  // Set default tempo and key signature based on the first MIDI file (arpeggiator)
-  if (arpeggiatorMidi) {
-    defaultTempo = arpeggiatorMidi.header.tempos[0].bpm || 111; // Default to 111 if not available
-    defaultKeySignature = 0; // A Major (no key shift)
-    updateSliders();
+  if (arpeggiatorMidi?.header?.tempos?.length > 0) {
+    defaultTempo = arpeggiatorMidi.header.tempos[0].bpm;
+    currentTempo = defaultTempo;
   }
+  updateSliders();
 });
 
-// Function to start playback of selected MIDI tracks
+// --------------------------
+// Playback Logic
+// --------------------------
 function startSelectedMIDI() {
-  if (arpeggiatorEnabled && arpeggiatorMidi) {
-    playMIDI(arpeggiatorMidi);
-  }
-  if (bassLineEnabled && bassLineMidi) {
-    playMIDI(bassLineMidi);
-  }
-  if (bellsEnabled && bellsMidi) {
-    playMIDI(bellsMidi);
-  }
-  if (blockChordsEnabled && blockChordsMidi) {
-    playMIDI(blockChordsMidi);
-  }
+  if (arpeggiatorEnabled && arpeggiatorMidi) playMIDI(arpeggiatorMidi);
+  if (bassLineEnabled && bassLineMidi) playMIDI(bassLineMidi);
+  if (bellsEnabled && bellsMidi) playMIDI(bellsMidi);
+  if (blockChordsEnabled && blockChordsMidi) playMIDI(blockChordsMidi);
 }
 
-// Play MIDI notes using Tone.js PolySynth
 function playMIDI(midi) {
   const now = Tone.now();
+  const tempoRatio = defaultTempo / currentTempo;
+
   midi.tracks.forEach((track) => {
     track.notes.forEach((note) => {
-      synth.triggerAttackRelease(note.name, note.duration, now + note.time);
+      // Apply key shift
+      const shiftedMidi = note.midi + keyShift;
+      const shiftedName = Tone.Frequency(shiftedMidi, "midi").toNote();
+
+      // Scale time and duration
+      const time = now + note.time * tempoRatio;
+      const duration = note.duration * tempoRatio;
+
+      // Trigger the note with attack + release
+      const voice = synth.triggerAttackRelease(shiftedName, duration, time);
+
+      // Track this voice so stopPlayback can cancel it
+      activeVoices.push(voice);
+
+      // Keep a scheduled event reference so we can clear it on Stop
+      const eventId = Tone.Transport.scheduleOnce(() => {},
+      note.time * tempoRatio);
+      scheduledEvents.push(eventId);
     });
   });
 }
 
-// Toggle function for each MIDI track
-function toggleTrack(trackName) {
-  switch (trackName) {
+// --------------------------
+// Stop Playback
+// --------------------------
+function stopPlayback() {
+  // Cancel all scheduled events
+  scheduledEvents.forEach((id) => Tone.Transport.clear(id));
+  scheduledEvents = [];
+
+  // Stop all currently playing notes
+  activeVoices.forEach((voice) => {
+    try {
+      synth.triggerRelease(voice);
+    } catch {}
+  });
+  activeVoices = [];
+
+  // Also hard-stop synth envelopes as safety
+  synth.releaseAll();
+}
+
+// --------------------------
+// UI Button Toggles
+// --------------------------
+function toggleTrack(track) {
+  switch (track) {
     case "arpeggiator":
       arpeggiatorEnabled = !arpeggiatorEnabled;
       toggleButtonColor("toggleArpeggiator", arpeggiatorEnabled);
@@ -99,72 +140,73 @@ function toggleTrack(trackName) {
   }
 }
 
-// Change button color based on active/inactive state
-function toggleButtonColor(buttonId, isActive) {
-  const button = document.getElementById(buttonId);
-  if (isActive) {
-    button.classList.add("active");
-    button.classList.remove("inactive");
-  } else {
-    button.classList.add("inactive");
-    button.classList.remove("active");
-  }
+function toggleButtonColor(id, active) {
+  const btn = document.getElementById(id);
+  btn.classList.toggle("active", active);
+  btn.classList.toggle("inactive", !active);
 }
 
-// Update the slider and displayed value
+// --------------------------
+// UI Sliders
+// --------------------------
 function updateSliders() {
-  document.getElementById("tempoSlider").value = defaultTempo / 120; // Set tempo slider (normalized)
-  document.getElementById("keySlider").value = defaultKeySignature; // Set key signature slider (A Major)
-  document.getElementById("gainSlider").value = 1; // Set the default gain to 1
-
-  // Display initial values
+  document.getElementById("tempoSlider").value = defaultTempo / 120;
   document.getElementById("tempoValue").textContent = `${defaultTempo} BPM`;
-  document.getElementById(
-    "keyValue"
-  ).textContent = `${defaultKeySignature} semitones (A Major)`;
+
+  document.getElementById("keySlider").value = 0;
+  document.getElementById("keyValue").textContent = `0 semitones`;
+
+  document.getElementById("gainSlider").value = 1;
+  document.getElementById("gainValue").textContent = "1";
 }
 
-// Event listener for the "Start Selections" button
-document.getElementById("startBtn").addEventListener("click", () => {
-  Tone.start(); // Ensure that Tone.js context is started after user gesture
-  Tone.context.resume(); // Explicitly resume the AudioContext
+// Gain
+document.getElementById("gainSlider").addEventListener("input", (e) => {
+  const val = parseFloat(e.target.value);
+  synth.volume.value = Tone.gainToDb(val);
+  document.getElementById("gainValue").textContent = val.toFixed(2);
+});
 
+// Tempo
+document.getElementById("tempoSlider").addEventListener("input", (e) => {
+  currentTempo = parseFloat(e.target.value) * 120;
+  document.getElementById("tempoValue").textContent = `${Math.round(
+    currentTempo
+  )} BPM`;
+});
+
+// Key Shift
+document.getElementById("keySlider").addEventListener("input", (e) => {
+  keyShift = parseInt(e.target.value);
+  document.getElementById("keyValue").textContent = `${keyShift} semitones`;
+});
+
+// --------------------------
+// Start & Stop Buttons
+// --------------------------
+document.getElementById("startBtn").addEventListener("click", async () => {
+  await Tone.start();
+  Tone.context.resume();
   startSelectedMIDI();
 });
 
-// Event listeners for MIDI track toggle buttons
+document.getElementById("stopBtn").addEventListener("click", () => {
+  stopPlayback();
+});
+
+// Track buttons
 document
   .getElementById("toggleArpeggiator")
   .addEventListener("click", () => toggleTrack("arpeggiator"));
+
 document
   .getElementById("toggleBassLine")
   .addEventListener("click", () => toggleTrack("bassLine"));
+
 document
   .getElementById("toggleBells")
   .addEventListener("click", () => toggleTrack("bells"));
+
 document
   .getElementById("toggleBlockChords")
   .addEventListener("click", () => toggleTrack("blockChords"));
-
-// Slider controls with updated value display
-document.getElementById("gainSlider").addEventListener("input", (e) => {
-  const gainValue = parseFloat(e.target.value);
-  document.getElementById("gainValue").textContent = gainValue.toFixed(2);
-  synth.volume.value = Tone.gainToDb(gainValue);
-});
-
-document.getElementById("tempoSlider").addEventListener("input", (e) => {
-  const tempoValue = parseFloat(e.target.value) * 120; // Convert back to actual BPM
-  document.getElementById("tempoValue").textContent = `${Math.round(
-    tempoValue
-  )} BPM`;
-  Tone.Transport.bpm.value = tempoValue; // Set the tempo value in Tone.js
-});
-
-document.getElementById("keySlider").addEventListener("input", (e) => {
-  const keyShiftValue = parseInt(e.target.value);
-  document.getElementById(
-    "keyValue"
-  ).textContent = `${keyShiftValue} semitones (A Major)`;
-  synth.set({ pitchShift: keyShiftValue });
-});
