@@ -1,0 +1,7 @@
+Testing and Problems:
+
+- encountering issues where I wasn't using the correct process to load the MIDI data
+SOLUTION: got help and was able to finally get working audio output
+
+- cannot stop playback once started
+SOLUTION: add a stop button

@@ -1,21 +1,33 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <title>Web Audio Song Player</title>
     <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/tone@14.8.32/build/Tone.js"></script>
+    <script src="https://unpkg.com/@tonejs/midi"></script>
   </head>
   <body>
     <h1>Playback for MIDI Song</h1>
     <h2>Final Project by Quinn Terry</h2>
 
-    <button id="playBtn">Start Timeline</button>
+    <!-- Start Playback Button -->
+    <button id="startBtn">Start Selections</button>
+    <button id="stopBtn">Stop Playback</button>
 
-    <button id="playBtn">Toggle Arpeggiator</button>
-    <button id="playBtn">Toggle Bass Line</button>
-    <button id="playBtn">Toggle Bells</button>
-    <button id="playBtn">Toggle Block Chords</button>
+    <!-- Toggle MIDI Tracks -->
+    <div class="button-container">
+      <button id="toggleArpeggiator" class="toggleBtn">
+        Toggle Arpeggiator
+      </button>
+      <button id="toggleBassLine" class="toggleBtn">Toggle Bass Line</button>
+      <button id="toggleBells" class="toggleBtn">Toggle Bells</button>
+      <button id="toggleBlockChords" class="toggleBtn">
+        Toggle Block Chords
+      </button>
+    </div>
 
+    <!-- Control Sliders -->
     <div class="control">
       <label>Gain:</label>
       <input
@@ -26,6 +38,7 @@
         value="1"
         step="0.01"
       />
+      <span id="gainValue">1.00</span>
     </div>
     <div class="control">
       <label>Tempo:</label>
@@ -37,6 +50,7 @@
         value="1"
         step="0.01"
       />
+      <span id="tempoValue">111 BPM</span>
     </div>
     <div class="control">
       <label>Key Shift (semitones):</label>
@@ -48,59 +62,10 @@
         value="0"
         step="1"
       />
+      <span id="keyValue">0 semitones (A Major)</span>
     </div>
 
-    <script>
-      let audioCtx, source, gainNode;
-      let isPlaying = false;
-      let buffer,
-        playbackRate = 1.0,
-        gainValue = 1.0,
-        keyShift = 0;
-
-      async function loadAudio(url) {
-        const response = await fetch(url);
-        const arrayBuffer = await response.arrayBuffer();
-        return await audioCtx.decodeAudioData(arrayBuffer);
-      }
-
-      async function startPlayback() {
-        if (!audioCtx) audioCtx = new AudioContext();
-        if (!buffer) buffer = await loadAudio("song.mp3"); // your audio file
-
-        source = audioCtx.createBufferSource();
-        gainNode = audioCtx.createGain();
-
-        // Basic pitch and tempo adjustment
-        source.playbackRate.value = playbackRate * Math.pow(2, keyShift / 12);
-        gainNode.gain.value = gainValue;
-
-        source.buffer = buffer;
-        source.connect(gainNode).connect(audioCtx.destination);
-        source.start(0);
-        isPlaying = true;
-      }
-
-      document.getElementById("playBtn").addEventListener("click", () => {
-        if (!isPlaying) startPlayback();
-      });
-
-      document.getElementById("gainSlider").addEventListener("input", (e) => {
-        gainValue = parseFloat(e.target.value);
-        if (gainNode) gainNode.gain.value = gainValue;
-      });
-
-      document.getElementById("tempoSlider").addEventListener("input", (e) => {
-        playbackRate = parseFloat(e.target.value);
-        if (source)
-          source.playbackRate.value = playbackRate * Math.pow(2, keyShift / 12);
-      });
-
-      document.getElementById("keySlider").addEventListener("input", (e) => {
-        keyShift = parseInt(e.target.value);
-        if (source)
-          source.playbackRate.value = playbackRate * Math.pow(2, keyShift / 12);
-      });
-    </script>
+    <!-- Link to the JavaScript File -->
+    <script src="script.js"></script>
   </body>
 </html>
