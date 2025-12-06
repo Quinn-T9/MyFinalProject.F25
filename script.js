@@ -16,71 +16,74 @@ const reverb = new Tone.Reverb().toDestination();
 synth.connect(reverb);
 
 // Track state
-let arpeggiatorEnabled = false;
-let bassLineEnabled = false;
-let bellsEnabled = false;
-let blockChordsEnabled = false;
+let trackEnabled = {
+  arpeggiator: false,
+  bassLine: false,
+  bells: false,
+  blockChords: false,
+};
 
-// Tempo + Key
-let defaultTempo = 111;
-let currentTempo = defaultTempo;
+// Tempo and Key
+let defaultTempo = 111; // baseline for slider normalization
+let currentTempo = defaultTempo; // active playback tempo
 let keyShift = 0;
 
-// Store Tone.Part objects for each track
+// MIDI storage
+let midiData = {};
+// Tone.Part storage
 let trackParts = {};
 
 // --------------------------
 // Load MIDI Files
 // --------------------------
+async function loadAllMIDIs() {
+  midiData.arpeggiator = await loadMIDI(midiFiles.arpeggiator);
+  midiData.bassLine = await loadMIDI(midiFiles.bassLine);
+  midiData.bells = await loadMIDI(midiFiles.bells);
+  midiData.blockChords = await loadMIDI(midiFiles.blockChords);
+
+  if (midiData.arpeggiator?.header?.tempos?.length > 0) {
+    defaultTempo = midiData.arpeggiator.header.tempos[0].bpm || 111;
+  }
+
+  updateSliders();
+}
+
 async function loadMIDI(file) {
   try {
-    const midi = await Midi.fromUrl(file);
-    return midi;
+    return await Midi.fromUrl(file);
   } catch (error) {
     console.error("Error loading MIDI:", error);
     return null;
   }
 }
 
-let arpeggiatorMidi, bassLineMidi, bellsMidi, blockChordsMidi;
-
-Promise.all([
-  loadMIDI(midiFiles.arpeggiator).then((m) => (arpeggiatorMidi = m)),
-  loadMIDI(midiFiles.bassLine).then((m) => (bassLineMidi = m)),
-  loadMIDI(midiFiles.bells).then((m) => (bellsMidi = m)),
-  loadMIDI(midiFiles.blockChords).then((m) => (blockChordsMidi = m)),
-]).then(() => {
-  if (arpeggiatorMidi?.header?.tempos?.length > 0) {
-    defaultTempo = arpeggiatorMidi.header.tempos[0].bpm;
-    currentTempo = defaultTempo;
-  }
-  updateSliders();
-});
-
 // --------------------------
-// Create a Tone.Part from a MIDI Track
+// Create Tone.Part for a MIDI track
 // --------------------------
-function createPartFromMIDI(midi) {
+function createPart(trackName) {
+  const midi = midiData[trackName];
+  if (!midi) return null;
+
   const events = [];
-
   midi.tracks.forEach((track) => {
     track.notes.forEach((note) => {
+      // Scale time and duration by currentTempo
+      const tempoRatio = defaultTempo / currentTempo;
       events.push({
-        time: note.time, // original MIDI time
+        time: note.time * tempoRatio,
         note: note.name,
-        duration: note.duration, // original MIDI duration
+        duration: note.duration * tempoRatio,
       });
     });
   });
 
   const part = new Tone.Part((time, value) => {
-    // Apply current key shift dynamically
+    // Apply key shift
     const shiftedMidi = Tone.Frequency(value.note).toMidi() + keyShift;
     const shiftedNote = Tone.Frequency(shiftedMidi, "midi").toNote();
 
-    // Apply current tempo scaling
-    const tempoRatio = defaultTempo / currentTempo;
-    synth.triggerAttackRelease(shiftedNote, value.duration * tempoRatio, time);
+    synth.triggerAttackRelease(shiftedNote, value.duration, time);
   }, events);
 
   part.loop = false;
@@ -91,28 +94,20 @@ function createPartFromMIDI(midi) {
 // Start Selected Tracks
 // --------------------------
 function startSelectedMIDI() {
-  // Stop previous parts before starting new ones
-  stopPlayback();
+  stopPlayback(); // clear previous playback
 
-  // Clear previous trackParts
-  trackParts = {};
+  // Update currentTempo from slider
+  const sliderValue = parseFloat(document.getElementById("tempoSlider").value);
+  currentTempo = defaultTempo * sliderValue;
+  Tone.Transport.bpm.value = currentTempo;
 
-  if (arpeggiatorEnabled && arpeggiatorMidi) {
-    trackParts.arpeggiator = createPartFromMIDI(arpeggiatorMidi);
-    trackParts.arpeggiator.start(0);
-  }
-  if (bassLineEnabled && bassLineMidi) {
-    trackParts.bassLine = createPartFromMIDI(bassLineMidi);
-    trackParts.bassLine.start(0);
-  }
-  if (bellsEnabled && bellsMidi) {
-    trackParts.bells = createPartFromMIDI(bellsMidi);
-    trackParts.bells.start(0);
-  }
-  if (blockChordsEnabled && blockChordsMidi) {
-    trackParts.blockChords = createPartFromMIDI(blockChordsMidi);
-    trackParts.blockChords.start(0);
-  }
+  // Create and start only enabled tracks
+  Object.keys(trackEnabled).forEach((trackName) => {
+    if (trackEnabled[trackName] && midiData[trackName]) {
+      trackParts[trackName] = createPart(trackName);
+      trackParts[trackName].start(0);
+    }
+  });
 
   Tone.Transport.start();
 }
@@ -124,32 +119,17 @@ function stopPlayback() {
   Tone.Transport.stop();
   Tone.Transport.cancel();
   Object.values(trackParts).forEach((part) => part.stop());
-  trackParts = {};
   synth.releaseAll();
+  trackParts = {}; // clear parts
+  // Do NOT reset tempo — slider remains at last BPM
 }
 
 // --------------------------
-// Track Toggle
+// Toggle Track
 // --------------------------
-function toggleTrack(track) {
-  switch (track) {
-    case "arpeggiator":
-      arpeggiatorEnabled = !arpeggiatorEnabled;
-      toggleButtonColor("toggleArpeggiator", arpeggiatorEnabled);
-      break;
-    case "bassLine":
-      bassLineEnabled = !bassLineEnabled;
-      toggleButtonColor("toggleBassLine", bassLineEnabled);
-      break;
-    case "bells":
-      bellsEnabled = !bellsEnabled;
-      toggleButtonColor("toggleBells", bellsEnabled);
-      break;
-    case "blockChords":
-      blockChordsEnabled = !blockChordsEnabled;
-      toggleButtonColor("toggleBlockChords", blockChordsEnabled);
-      break;
-  }
+function toggleTrack(trackName) {
+  trackEnabled[trackName] = !trackEnabled[trackName];
+  toggleButtonColor(`toggle${capitalize(trackName)}`, trackEnabled[trackName]);
 }
 
 function toggleButtonColor(id, active) {
@@ -158,15 +138,22 @@ function toggleButtonColor(id, active) {
   btn.classList.toggle("inactive", !active);
 }
 
+function capitalize(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
 // --------------------------
 // Sliders
 // --------------------------
 function updateSliders() {
-  document.getElementById("tempoSlider").value = defaultTempo / 120;
-  document.getElementById("tempoValue").textContent = `${defaultTempo} BPM`;
+  // Tempo slider normalized (default = 1)
+  document.getElementById("tempoSlider").value = currentTempo / defaultTempo;
+  document.getElementById("tempoValue").textContent = `${Math.round(
+    currentTempo
+  )} BPM`;
 
-  document.getElementById("keySlider").value = 0;
-  document.getElementById("keyValue").textContent = `0 semitones`;
+  document.getElementById("keySlider").value = keyShift;
+  document.getElementById("keyValue").textContent = `${keyShift} semitones`;
 
   document.getElementById("gainSlider").value = 1;
   document.getElementById("gainValue").textContent = "1";
@@ -179,24 +166,24 @@ document.getElementById("gainSlider").addEventListener("input", (e) => {
   document.getElementById("gainValue").textContent = val.toFixed(2);
 });
 
-// Tempo slider
+// Tempo slider — live, always dictates currentTempo
 document.getElementById("tempoSlider").addEventListener("input", (e) => {
-  currentTempo = parseFloat(e.target.value) * 120;
+  const sliderValue = parseFloat(e.target.value);
+  currentTempo = defaultTempo * sliderValue;
+  Tone.Transport.bpm.rampTo(currentTempo, 0.1); // smooth tempo transition
   document.getElementById("tempoValue").textContent = `${Math.round(
     currentTempo
   )} BPM`;
-  // Already scheduled notes use this new tempo ratio for future notes
 });
 
-// Key shift slider
+// Key shift — affects future notes
 document.getElementById("keySlider").addEventListener("input", (e) => {
   keyShift = parseInt(e.target.value);
   document.getElementById("keyValue").textContent = `${keyShift} semitones`;
-  // Future notes will use this key shift
 });
 
 // --------------------------
-// Start / Stop Buttons
+// Buttons
 // --------------------------
 document.getElementById("startBtn").addEventListener("click", async () => {
   await Tone.start();
@@ -221,3 +208,8 @@ document
 document
   .getElementById("toggleBlockChords")
   .addEventListener("click", () => toggleTrack("blockChords"));
+
+// --------------------------
+// Load all MIDI files
+// --------------------------
+loadAllMIDIs();

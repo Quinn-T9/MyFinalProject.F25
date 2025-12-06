@@ -5,3 +5,11 @@ SOLUTION: got help and was able to finally get working audio output
 
 - cannot stop playback once started
 SOLUTION: add a stop button
+
+- the playback tempo is not preserved when stopping and restarting another playback instance 
+    (it defaults back to 111 BPM no matter what the ending value of the slider reads)
+SOLUTION: preserve the slider's tempo as an absolute priority, ensuring that whatever tempo it reads is used
+
+- note values are hanging and overlapping when the tempo is shifted
+SOLUTION: scale note durations relative to the playback speed to maintain the right spacings
+
