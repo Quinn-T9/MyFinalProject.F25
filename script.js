@@ -11,7 +11,7 @@ const midiFiles = {
 // --------------------------
 // Tone.js Setup
 // --------------------------
-const synth = new Tone.PolySynth().toDestination();
+const synth = new Tone.PolySynth(Tone.Synth).toDestination();
 const reverb = new Tone.Reverb().toDestination();
 synth.connect(reverb);
 
@@ -26,9 +26,8 @@ let defaultTempo = 111;
 let currentTempo = defaultTempo;
 let keyShift = 0;
 
-// Active scheduled events and voices
-let scheduledEvents = [];
-let activeVoices = [];
+// Store Tone.Part objects for each track
+let trackParts = {};
 
 // --------------------------
 // Load MIDI Files
@@ -59,65 +58,78 @@ Promise.all([
 });
 
 // --------------------------
-// Playback Logic
+// Create a Tone.Part from a MIDI Track
 // --------------------------
-function startSelectedMIDI() {
-  if (arpeggiatorEnabled && arpeggiatorMidi) playMIDI(arpeggiatorMidi);
-  if (bassLineEnabled && bassLineMidi) playMIDI(bassLineMidi);
-  if (bellsEnabled && bellsMidi) playMIDI(bellsMidi);
-  if (blockChordsEnabled && blockChordsMidi) playMIDI(blockChordsMidi);
-}
-
-function playMIDI(midi) {
-  const now = Tone.now();
-  const tempoRatio = defaultTempo / currentTempo;
+function createPartFromMIDI(midi) {
+  const events = [];
 
   midi.tracks.forEach((track) => {
     track.notes.forEach((note) => {
-      // Apply key shift
-      const shiftedMidi = note.midi + keyShift;
-      const shiftedName = Tone.Frequency(shiftedMidi, "midi").toNote();
-
-      // Scale time and duration
-      const time = now + note.time * tempoRatio;
-      const duration = note.duration * tempoRatio;
-
-      // Trigger the note with attack + release
-      const voice = synth.triggerAttackRelease(shiftedName, duration, time);
-
-      // Track this voice so stopPlayback can cancel it
-      activeVoices.push(voice);
-
-      // Keep a scheduled event reference so we can clear it on Stop
-      const eventId = Tone.Transport.scheduleOnce(() => {},
-      note.time * tempoRatio);
-      scheduledEvents.push(eventId);
+      events.push({
+        time: note.time, // original MIDI time
+        note: note.name,
+        duration: note.duration, // original MIDI duration
+      });
     });
   });
+
+  const part = new Tone.Part((time, value) => {
+    // Apply current key shift dynamically
+    const shiftedMidi = Tone.Frequency(value.note).toMidi() + keyShift;
+    const shiftedNote = Tone.Frequency(shiftedMidi, "midi").toNote();
+
+    // Apply current tempo scaling
+    const tempoRatio = defaultTempo / currentTempo;
+    synth.triggerAttackRelease(shiftedNote, value.duration * tempoRatio, time);
+  }, events);
+
+  part.loop = false;
+  return part;
+}
+
+// --------------------------
+// Start Selected Tracks
+// --------------------------
+function startSelectedMIDI() {
+  // Stop previous parts before starting new ones
+  stopPlayback();
+
+  // Clear previous trackParts
+  trackParts = {};
+
+  if (arpeggiatorEnabled && arpeggiatorMidi) {
+    trackParts.arpeggiator = createPartFromMIDI(arpeggiatorMidi);
+    trackParts.arpeggiator.start(0);
+  }
+  if (bassLineEnabled && bassLineMidi) {
+    trackParts.bassLine = createPartFromMIDI(bassLineMidi);
+    trackParts.bassLine.start(0);
+  }
+  if (bellsEnabled && bellsMidi) {
+    trackParts.bells = createPartFromMIDI(bellsMidi);
+    trackParts.bells.start(0);
+  }
+  if (blockChordsEnabled && blockChordsMidi) {
+    trackParts.blockChords = createPartFromMIDI(blockChordsMidi);
+    trackParts.blockChords.start(0);
+  }
+
+  Tone.Transport.start();
 }
 
 // --------------------------
 // Stop Playback
 // --------------------------
 function stopPlayback() {
-  // Cancel all scheduled events
-  scheduledEvents.forEach((id) => Tone.Transport.clear(id));
-  scheduledEvents = [];
-
-  // Stop all currently playing notes
-  activeVoices.forEach((voice) => {
-    try {
-      synth.triggerRelease(voice);
-    } catch {}
-  });
-  activeVoices = [];
-
-  // Also hard-stop synth envelopes as safety
+  Tone.Transport.stop();
+  Tone.Transport.cancel();
+  Object.values(trackParts).forEach((part) => part.stop());
+  trackParts = {};
   synth.releaseAll();
 }
 
 // --------------------------
-// UI Button Toggles
+// Track Toggle
 // --------------------------
 function toggleTrack(track) {
   switch (track) {
@@ -147,7 +159,7 @@ function toggleButtonColor(id, active) {
 }
 
 // --------------------------
-// UI Sliders
+// Sliders
 // --------------------------
 function updateSliders() {
   document.getElementById("tempoSlider").value = defaultTempo / 120;
@@ -160,29 +172,31 @@ function updateSliders() {
   document.getElementById("gainValue").textContent = "1";
 }
 
-// Gain
+// Gain slider
 document.getElementById("gainSlider").addEventListener("input", (e) => {
   const val = parseFloat(e.target.value);
   synth.volume.value = Tone.gainToDb(val);
   document.getElementById("gainValue").textContent = val.toFixed(2);
 });
 
-// Tempo
+// Tempo slider
 document.getElementById("tempoSlider").addEventListener("input", (e) => {
   currentTempo = parseFloat(e.target.value) * 120;
   document.getElementById("tempoValue").textContent = `${Math.round(
     currentTempo
   )} BPM`;
+  // Already scheduled notes use this new tempo ratio for future notes
 });
 
-// Key Shift
+// Key shift slider
 document.getElementById("keySlider").addEventListener("input", (e) => {
   keyShift = parseInt(e.target.value);
   document.getElementById("keyValue").textContent = `${keyShift} semitones`;
+  // Future notes will use this key shift
 });
 
 // --------------------------
-// Start & Stop Buttons
+// Start / Stop Buttons
 // --------------------------
 document.getElementById("startBtn").addEventListener("click", async () => {
   await Tone.start();
@@ -198,15 +212,12 @@ document.getElementById("stopBtn").addEventListener("click", () => {
 document
   .getElementById("toggleArpeggiator")
   .addEventListener("click", () => toggleTrack("arpeggiator"));
-
 document
   .getElementById("toggleBassLine")
   .addEventListener("click", () => toggleTrack("bassLine"));
-
 document
   .getElementById("toggleBells")
   .addEventListener("click", () => toggleTrack("bells"));
-
 document
   .getElementById("toggleBlockChords")
   .addEventListener("click", () => toggleTrack("blockChords"));
